@@ -1,0 +1,17 @@
+.recording {
+    width: 140px;
+    height: 140px;
+    animation: lds-heart 2s infinite;
+}
+
+@keyframes lds-heart {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
