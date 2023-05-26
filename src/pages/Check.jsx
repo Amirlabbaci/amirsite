@@ -119,7 +119,7 @@ const Check = () => {
                 });
 
 
-                // setChecking(true)
+                setChecking(true)
                 axios.post("http://127.0.0.1:5000/predict", formData, {
                     headers: {
                         "Content-Type": "multipart/form-data",
