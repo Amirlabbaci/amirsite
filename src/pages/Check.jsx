@@ -188,7 +188,7 @@ const Check = () => {
                                                     height: '30px',
                                                     cursor: 'pointer',
                                                     // Add the following styles to change the selected color
-                                                    "accent-color": "#ff3b00",
+                                                    accentColor: "#ff3b00",
                                                 }}
                                                 onChange={(e) => {
                                                     if (e.target.checked) {
