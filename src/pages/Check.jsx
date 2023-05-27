@@ -22,7 +22,7 @@ import { useNavigate } from "react-router-dom";
 
 // Libraries
 import axios from "axios";
-import "../lib/recorder.js";
+// import "../lib/recorder.js";
 
 // Images
 import cough from '../assets/cough.png'
@@ -67,37 +67,37 @@ const Check = () => {
     }
 
     const recordAudio = async () => {
-        setRecording(true);
-
-        const constraints = {
-            audio: {
-                sampleRate: 16000,
-                channelCount: 1,
-            },
-        };
-
-        navigator.mediaDevices.getUserMedia(constraints)
+        navigator.mediaDevices.getUserMedia({ audio: true })
             .then((stream) => {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const mediaStreamSource = audioContext.createMediaStreamSource(stream);
-                const recorder = new Recorder(mediaStreamSource);
+                const mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
 
-                recorder.record();
+                const audioChunks = [];
+                mediaRecorder.addEventListener("dataavailable", (event) => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener("stop", () => {
+                    const audioBlob = new Blob(audioChunks);
+                    setRecordedAudio(audioBlob);
+                });
 
                 setTimeout(() => {
-                    recorder.stop();
+                    mediaRecorder.stop();
                     setRecording(false);
-
-                    recorder.exportWAV((audioBlob) => {
-                        setRecordedAudio(audioBlob);
-                    });
-
-                    recorder.clear();
                 }, 5000);
             })
-            .catch((error) => {
-                console.error('Error accessing microphone:', error);
+            .catch((err) => {
+                toast({
+                    title: "Please allow microphone access",
+                    status: "error",
+                    duration: 5000,
+                    isClosable: true,
+                });
+                setRecording(false);
             });
+
+        setRecording(true);
     };
 
 
@@ -111,8 +111,9 @@ const Check = () => {
             })
         } else {
             try {
+
                 const formData = new FormData();
-                formData.append("file", RecordedAudio, "cough.wav");
+                formData.append("file", RecordedAudio);
                 SelectedSymptoms.forEach((symptom) => {
                     formData.append(symptom, true);
                 });
@@ -145,6 +146,11 @@ const Check = () => {
             }
         }
     }
+
+    const playAudio = () => {
+        const audio = new Audio(URL.createObjectURL(RecordedAudio));
+        audio.play();
+    };
     return (
         <Box display='flex' flexDirection='column' justifyContent='center' alignItems='center' w='100%' h='100vh'>
             {step === 1 && (
