@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 
 // Libraries
 import axios from "axios";
+import "../lib/recorder.js";
 
 // Images
 import cough from '../assets/cough.png'
@@ -65,40 +66,27 @@ const Check = () => {
         }
     }
 
-    const recordAudio = () => {
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(stream => {
-                const mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.start();
-
-                const audioChunks = [];
-                mediaRecorder.addEventListener("dataavailable", event => {
-                    audioChunks.push(event.data);
-                });
-
-                mediaRecorder.addEventListener("stop", () => {
-                    const audioBlob = new Blob(audioChunks);
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    const audio = new Audio(audioUrl);
-                    setRecordedAudio(audio)
-                });
-
-                setTimeout(() => {
-                    mediaRecorder.stop();
-                    setRecording(false)
-                }, 5000);
-            })
-            .catch(err => {
-                toast({
-                    title: "Please allow microphone access",
-                    status: "error",
-                    duration: 5000,
-                    isClosable: true,
-                })
-                setRecording(false)
-            })
+    const recordAudio = async () => {
         setRecording(true);
-    }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const mediaStreamSource = audioContext.createMediaStreamSource(stream);
+        const recorder = new Recorder(mediaStreamSource);
+
+        recorder.record();
+
+        setTimeout(() => {
+            recorder.stop();
+            setRecording(false);
+
+            recorder.exportWAV((audioBlob) => {
+                setRecordedAudio(audioBlob);
+            });
+
+            recorder.clear();
+        }, 5000);
+    };
 
 
     const checkCovidResult = async () => {
@@ -111,13 +99,11 @@ const Check = () => {
             })
         } else {
             try {
-                const file = new File([RecordedAudio], "cough.wav", { type: "audio/wav" });
                 const formData = new FormData();
-                formData.append("file", file);
+                formData.append("file", RecordedAudio);
                 SelectedSymptoms.forEach((symptom) => {
                     formData.append(symptom, true);
                 });
-
 
                 setChecking(true)
                 axios.post("http://127.0.0.1:5000/predict", formData, {
