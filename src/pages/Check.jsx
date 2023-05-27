@@ -69,23 +69,35 @@ const Check = () => {
     const recordAudio = async () => {
         setRecording(true);
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const mediaStreamSource = audioContext.createMediaStreamSource(stream);
-        const recorder = new Recorder(mediaStreamSource);
+        const constraints = {
+            audio: {
+                sampleRate: 16000,
+                channelCount: 1,
+            },
+        };
 
-        recorder.record();
+        navigator.mediaDevices.getUserMedia(constraints)
+            .then((stream) => {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const mediaStreamSource = audioContext.createMediaStreamSource(stream);
+                const recorder = new Recorder(mediaStreamSource);
 
-        setTimeout(() => {
-            recorder.stop();
-            setRecording(false);
+                recorder.record();
 
-            recorder.exportWAV((audioBlob) => {
-                setRecordedAudio(audioBlob);
+                setTimeout(() => {
+                    recorder.stop();
+                    setRecording(false);
+
+                    recorder.exportWAV((audioBlob) => {
+                        setRecordedAudio(audioBlob);
+                    });
+
+                    recorder.clear();
+                }, 5000);
+            })
+            .catch((error) => {
+                console.error('Error accessing microphone:', error);
             });
-
-            recorder.clear();
-        }, 5000);
     };
 
 
@@ -100,7 +112,7 @@ const Check = () => {
         } else {
             try {
                 const formData = new FormData();
-                formData.append("file", RecordedAudio);
+                formData.append("file", RecordedAudio, "cough.wav");
                 SelectedSymptoms.forEach((symptom) => {
                     formData.append(symptom, true);
                 });
