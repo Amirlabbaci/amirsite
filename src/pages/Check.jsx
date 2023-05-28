@@ -22,7 +22,8 @@ import { useNavigate } from "react-router-dom";
 
 // Libraries
 import axios from "axios";
-// import "../lib/recorder.js";
+import "../lib/recorder.js";
+import audioBufferToWav  from 'audiobuffer-to-wav';
 
 // Images
 import cough from '../assets/cough.png'
@@ -67,38 +68,98 @@ const Check = () => {
     }
 
     const recordAudio = async () => {
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then((stream) => {
-                const mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.start();
+        setRecording(true);
 
-                const audioChunks = [];
-                mediaRecorder.addEventListener("dataavailable", (event) => {
-                    audioChunks.push(event.data);
-                });
+        const constraints = {
+            audio: {
+                sampleRate: 48000,
+                channelCount: 1,
+            },
+        };
 
-                mediaRecorder.addEventListener("stop", () => {
-                    const audioBlob = new Blob(audioChunks);
-                    setRecordedAudio(audioBlob);
-                });
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const mediaStreamSource = audioContext.createMediaStreamSource(stream);
+        const recorder = new Recorder(mediaStreamSource, { sampleRate: 48000 });
 
-                setTimeout(() => {
-                    mediaRecorder.stop();
-                    setRecording(false);
-                }, 5000);
-            })
-            .catch((err) => {
-                toast({
-                    title: "Please allow microphone access",
-                    status: "error",
-                    duration: 5000,
-                    isClosable: true,
-                });
-                setRecording(false);
+        recorder.record();
+
+        setTimeout(() => {
+            recorder.stop();
+            setRecording(false);
+
+            recorder.exportWAV((audioBlob) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const arrayBuffer = reader.result;
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    audioContext.decodeAudioData(arrayBuffer, (audioBuffer) => {
+                        const originalSampleRate = audioBuffer.sampleRate;
+                        const targetSampleRate = 16000;
+
+                        const channelData = audioBuffer.getChannelData(0); // Assuming mono audio
+
+                        // Downsampling the audio buffer
+                        const downsampledBuffer = downsampleBuffer(channelData, originalSampleRate, targetSampleRate);
+
+                        // Creating a new AudioBuffer with the downsampled buffer and target sample rate
+                        const newAudioBuffer = audioContext.createBuffer(1, downsampledBuffer.length, targetSampleRate);
+                        const newChannelData = newAudioBuffer.getChannelData(0);
+                        newChannelData.set(downsampledBuffer);
+
+                        // Encoding the new AudioBuffer to WAV format
+                        const wavBuffer = audioBufferToWav(newAudioBuffer);
+
+                        // Creating a Blob from the WAV buffer
+                        const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' });
+
+
+                        setRecordedAudio(wavBlob);
+                    });
+                };
+                reader.readAsArrayBuffer(audioBlob);
             });
 
-        setRecording(true);
+            recorder.clear();
+        }, 5000);
     };
+
+    const downsampleBuffer = (buffer, originalSampleRate, targetSampleRate) => {
+        if (targetSampleRate === originalSampleRate) {
+            return buffer;
+        }
+
+        if (targetSampleRate > originalSampleRate) {
+            throw "Downsampling rate should be smaller than the original sample rate";
+        }
+
+        const sampleRateRatio = originalSampleRate / targetSampleRate;
+        const newLength = Math.round(buffer.length / sampleRateRatio);
+        const result = new Float32Array(newLength);
+        let offsetResult = 0;
+        let offsetBuffer = 0;
+
+        while (offsetResult < result.length) {
+            const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+
+            // Use average value of skipped samples
+            let accum = 0;
+            let count = 0;
+            for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+                accum += buffer[i];
+                count++;
+            }
+
+            result[offsetResult] = accum / count;
+            // Or you can simply get rid of the skipped samples:
+            // result[offsetResult] = buffer[nextOffsetBuffer];
+
+            offsetResult++;
+            offsetBuffer = nextOffsetBuffer;
+        }
+
+        return result;
+    }
 
 
     const checkCovidResult = async () => {
@@ -111,15 +172,14 @@ const Check = () => {
             })
         } else {
             try {
-
                 const formData = new FormData();
-                formData.append("file", RecordedAudio);
+                formData.append("file", RecordedAudio, "cough.wav");
                 SelectedSymptoms.forEach((symptom) => {
                     formData.append(symptom, true);
                 });
 
                 setChecking(true)
-                axios.post("http://127.0.0.1:5000/predict", formData, {
+                axios.post("https://covid-19-test.onrender.com/predict", formData, {
                     headers: {
                         "Content-Type": "multipart/form-data",
                         "Access-Control-Allow-Origin": "*",
@@ -146,11 +206,6 @@ const Check = () => {
             }
         }
     }
-
-    const playAudio = () => {
-        const audio = new Audio(URL.createObjectURL(RecordedAudio));
-        audio.play();
-    };
     return (
         <Box display='flex' flexDirection='column' justifyContent='center' alignItems='center' w='100%' h='100vh'>
             {step === 1 && (
