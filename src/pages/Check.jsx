@@ -11,6 +11,7 @@ import {
     Text,
     Tr,
     useToast,
+    Progress
 } from "@chakra-ui/react";
 
 // Hooks
@@ -23,7 +24,7 @@ import { useNavigate } from "react-router-dom";
 // Libraries
 import axios from "axios";
 import "../lib/recorder.js";
-import audioBufferToWav  from 'audiobuffer-to-wav';
+import audioBufferToWav from 'audiobuffer-to-wav';
 
 // Images
 import cough from '../assets/cough.png'
@@ -50,6 +51,12 @@ const Check = () => {
 
     const [Checking, setChecking] = useState(false)
 
+    const [ProgressStart, setProgressStart] = useState(false)
+    const [ProgressInterval, setProgressInterval] = useState(null)
+    const [ProgressNumber, setProgressNumber] = useState(0)
+
+    const [IsRecheck, setIsRecheck] = useState(false)
+
 
     const toast = useToast()
     const navigate = useNavigate()
@@ -67,8 +74,10 @@ const Check = () => {
         }
     }
 
-    const recordAudio = async () => {
+    const recordAudio = async (interval) => {
+        setProgressStart(true);
         setRecording(true);
+        setProgressNumber(0);
 
         const constraints = {
             audio: {
@@ -83,6 +92,8 @@ const Check = () => {
         const recorder = new Recorder(mediaStreamSource, { sampleRate: 48000 });
 
         recorder.record();
+
+        const startTime = Date.now(); // Get the start time
 
         setTimeout(() => {
             recorder.stop();
@@ -113,15 +124,23 @@ const Check = () => {
                         // Creating a Blob from the WAV buffer
                         const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' });
 
-
                         setRecordedAudio(wavBlob);
+                        clearInterval(progressInterval);
                     });
                 };
                 reader.readAsArrayBuffer(audioBlob);
             });
 
             recorder.clear();
-        }, 5000);
+        }, 10000);
+
+        // Calculate progress based on elapsed time
+        const progressInterval = setInterval(() => {
+            const elapsedTime = Date.now() - startTime;
+            const progress = (elapsedTime / 10000) * 100; // Calculate progress percentage
+            setProgressNumber(progress);
+        }, 50);
+
     };
 
     const downsampleBuffer = (buffer, originalSampleRate, targetSampleRate) => {
@@ -177,21 +196,24 @@ const Check = () => {
                 SelectedSymptoms.forEach((symptom) => {
                     formData.append(symptom, true);
                 });
+                formData.append("isRecheck",IsRecheck)
 
                 setChecking(true)
-                axios.post("https://covid-19-test.onrender.com/predict", formData, {
+                axios.post("http://134.122.75.238:5000/predict", formData, {
                     headers: {
                         "Content-Type": "multipart/form-data",
                         "Access-Control-Allow-Origin": "*",
                     },
                 })
                     .then((res) => {
-                        if (res.data.code == 3) throw new Error("Please provide another Cough Test")
+                        if (res.data.code == 2) {
+                            throw new Error(res.data.result)
+                        }
                         navigate('/result', { state: res.data })
                     })
                     .catch((err) => {
                         toast({
-                            title: "Please provide another Cough Test",
+                            title:  err.message || "Please provide another Cough Test",
                             status: "error",
                             duration: 5000,
                             isClosable: true,
@@ -199,6 +221,7 @@ const Check = () => {
                     })
                     .finally(() => {
                         setChecking(false)
+                        setIsRecheck(true)
                     })
 
             } catch (error) {
@@ -299,6 +322,7 @@ const Check = () => {
                         </Text>
                         <Img src={cough} w='150px' h='150px' mt={3} mb={10} />
                     </Box>
+
                     <Box
                         display='flex'
                         flexDirection='column'
@@ -315,6 +339,18 @@ const Check = () => {
                             color={Recording ? 'green.500' : 'gray.500'}
                             mb='20px'
                         />
+                        <Progress
+                            value={ProgressNumber}
+                            borderRadius='50px'
+                            w='100%'
+                            h='20px'
+                            color='green.500'
+                            colorScheme='green'
+                            mb='30px'
+                            style={{
+                                visibility: (ProgressStart) ? "visible" : "hidden"
+                            }}
+                        />
                         <Button
                             w='180px'
                             colorScheme='orange'
@@ -330,6 +366,7 @@ const Check = () => {
                             {Recording ? 'Caughing...' : 'Record'}
 
                         </Button>
+
                         <Button
                             w='180px'
                             bg={RecordedAudio ? 'green.400' : 'gray.500'}
