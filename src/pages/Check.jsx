@@ -196,7 +196,7 @@ const Check = () => {
                 SelectedSymptoms.forEach((symptom) => {
                     formData.append(symptom, true);
                 });
-                formData.append("isRecheck",IsRecheck)
+                formData.append("is_recheck",IsRecheck)
 
                 setChecking(true)
                 axios.post("http://134.122.75.238:5000/predict", formData, {
