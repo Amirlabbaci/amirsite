@@ -192,11 +192,20 @@ const Check = () => {
         } else {
             try {
                 const formData = new FormData();
+
                 formData.append("file", RecordedAudio, "cough.wav");
-                SelectedSymptoms.forEach((symptom) => {
-                    formData.append(symptom, true);
+
+                formData.append("is_recheck",IsRecheck);
+
+                Symptoms.forEach((symptom) => {
+                    if(SelectedSymptoms.includes(symptom[0])){
+                        formData.append(symptom[0], true);
+                    }else{
+                        formData.append(symptom[0], false);
+                    }
                 });
-                formData.append("is_recheck",IsRecheck)
+
+                
 
                 setChecking(true)
                 axios.post("http://134.122.75.238:5000/predict", formData, {
@@ -209,7 +218,7 @@ const Check = () => {
                         if (res.data.code == 2) {
                             throw new Error(res.data.result)
                         }
-                        navigate('/result', { state: res.data })
+                        navigate('/result', { state: res.data });
                     })
                     .catch((err) => {
                         toast({
@@ -220,8 +229,8 @@ const Check = () => {
                         })
                     })
                     .finally(() => {
-                        setChecking(false)
-                        setIsRecheck(true)
+                        setChecking(false);
+                        setIsRecheck(true);
                     })
 
             } catch (error) {
