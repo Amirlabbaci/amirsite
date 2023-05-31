@@ -23,7 +23,6 @@ import { useNavigate } from "react-router-dom";
 
 // Libraries
 import axios from "axios";
-import "../lib/recorder.js";
 import audioBufferToWav from 'audiobuffer-to-wav';
 
 // Images
