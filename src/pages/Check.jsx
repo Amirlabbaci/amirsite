@@ -24,6 +24,7 @@ import { useNavigate } from "react-router-dom";
 // Libraries
 import axios from "axios";
 import audioBufferToWav from 'audiobuffer-to-wav';
+import Recorder from "wav-web-audio-recorder";
 
 // Images
 import cough from '../assets/cough.png'
@@ -64,73 +65,69 @@ const Check = () => {
         setStep(step + 1)
     }
 
-    const recordAudio = async (interval) => {
+    const recordAudio = () => {
         setProgressStart(true);
-        setRecording(true);
-        setProgressNumber(0);
 
-        const constraints = {
-            audio: {
-                sampleRate: 48000,
-                channelCount: 1,
-            },
-        };
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+            const recorder = new Recorder(stream);
+            recorder.start();
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const mediaStreamSource = audioContext.createMediaStreamSource(stream);
-        const recorder = new Recorder(mediaStreamSource, { sampleRate: 48000 });
+            setTimeout(() => {
+                recorder.stop();
+                recorder
+                    .export()
+                    .then((audioBlob) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            const arrayBuffer = reader.result;
+                            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                            audioContext.decodeAudioData(arrayBuffer)
+                                .then((audioBuffer) => {
+                                    const originalSampleRate = audioBuffer.sampleRate;
+                                    const targetSampleRate = 16000;
 
-        recorder.record();
+                                    const channelData = audioBuffer.getChannelData(0); // Assuming mono audio
 
-        const startTime = Date.now(); // Get the start time
+                                    // Downsampling the audio buffer
+                                    const downsampledBuffer = downsampleBuffer(channelData, originalSampleRate, targetSampleRate);
 
-        setTimeout(() => {
-            recorder.stop();
-            setRecording(false);
+                                    // Creating a new AudioBuffer with the downsampled buffer and target sample rate
+                                    const newAudioBuffer = audioContext.createBuffer(1, downsampledBuffer.length, targetSampleRate);
+                                    const newChannelData = newAudioBuffer.getChannelData(0);
+                                    newChannelData.set(downsampledBuffer);
 
-            recorder.exportWAV((audioBlob) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const arrayBuffer = reader.result;
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    audioContext.decodeAudioData(arrayBuffer, (audioBuffer) => {
-                        const originalSampleRate = audioBuffer.sampleRate;
-                        const targetSampleRate = 16000;
+                                    // Encoding the new AudioBuffer to WAV format
+                                    const wavBuffer = audioBufferToWav(newAudioBuffer);
 
-                        const channelData = audioBuffer.getChannelData(0); // Assuming mono audio
+                                    // Creating a Blob from the WAV buffer
+                                    const wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
 
-                        // Downsampling the audio buffer
-                        const downsampledBuffer = downsampleBuffer(channelData, originalSampleRate, targetSampleRate);
-
-                        // Creating a new AudioBuffer with the downsampled buffer and target sample rate
-                        const newAudioBuffer = audioContext.createBuffer(1, downsampledBuffer.length, targetSampleRate);
-                        const newChannelData = newAudioBuffer.getChannelData(0);
-                        newChannelData.set(downsampledBuffer);
-
-                        // Encoding the new AudioBuffer to WAV format
-                        const wavBuffer = audioBufferToWav(newAudioBuffer);
-
-                        // Creating a Blob from the WAV buffer
-                        const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' });
-
-                        setRecordedAudio(wavBlob);
-                        clearInterval(progressInterval);
+                                    setRecordedAudio(wavBlob);
+                                    setRecording(false);
+                                    clearInterval(progressInterval);
+                                })
+                                .catch((error) => {
+                                    console.error("Error decoding audio data:", error);
+                                    setRecording(false);
+                                });
+                        };
+                        reader.readAsArrayBuffer(audioBlob);
+                    })
+                    .catch((error) => {
+                        // do something
                     });
-                };
-                reader.readAsArrayBuffer(audioBlob);
-            });
+            }, 10000);
+        });
 
-            recorder.clear();
-        }, 10000);
 
-        // Calculate progress based on elapsed time
+        const startTime = Date.now();
         const progressInterval = setInterval(() => {
             const elapsedTime = Date.now() - startTime;
             const progress = (elapsedTime / 10000) * 100; // Calculate progress percentage
             setProgressNumber(progress);
         }, 50);
 
+        setRecording(true);
     };
 
     const downsampleBuffer = (buffer, originalSampleRate, targetSampleRate) => {
@@ -185,17 +182,17 @@ const Check = () => {
 
                 formData.append("file", RecordedAudio, "cough.wav");
 
-                formData.append("is_recheck",IsRecheck);
+                formData.append("is_recheck", IsRecheck);
 
                 Symptoms.forEach((symptom) => {
-                    if(SelectedSymptoms.includes(symptom[0])){
+                    if (SelectedSymptoms.includes(symptom[0])) {
                         formData.append(symptom[0], true);
-                    }else{
+                    } else {
                         formData.append(symptom[0], false);
                     }
                 });
 
-                
+
 
                 setChecking(true)
                 axios.post("http://134.122.75.238:5000/predict", formData, {
@@ -212,7 +209,7 @@ const Check = () => {
                     })
                     .catch((err) => {
                         toast({
-                            title:  err.message || "Please provide another Cough Test",
+                            title: err.message || "Please provide another Cough Test",
                             status: "error",
                             duration: 5000,
                             isClosable: true,
