@@ -25,9 +25,9 @@ const Main = () => {
                             Covid 19 Motivation
                         </Button>
                     </Link>
-                    <Link to='/check'>
+                    <Link to='/test'>
                         <Button w='220px' colorScheme='orange' bg="#f2805e" size='lg' borderRadius='50px' p={8}>
-                            Covid 19 Check
+                            Covid 19 TEST
                         </Button>
                     </Link>
                 </Box>

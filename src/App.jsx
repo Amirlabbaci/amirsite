@@ -21,7 +21,7 @@ const router = createBrowserRouter(
     <Route path="/" element={<RootLayout />}>
       <Route index element={<Main />} />
       <Route path='/motivation' element={<Motivation />} />
-      <Route path='/check' element={<Check />} />
+      <Route path='/test' element={<Check />} />
       <Route path='/result' element={<Result />} />
       <Route path='/covid-prevention' element={<CovidPrevention />} />
       <Route path='/covid-advice' element={<CovidAdvice />} />

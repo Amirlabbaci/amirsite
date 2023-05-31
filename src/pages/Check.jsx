@@ -62,16 +62,7 @@ const Check = () => {
     const navigate = useNavigate()
 
     const nextStep = () => {
-        if (SelectedSymptoms.length === 0) {
-            toast({
-                title: "Please select at least one symptom",
-                status: "error",
-                duration: 5000,
-                isClosable: true,
-            })
-        } else {
-            setStep(step + 1)
-        }
+        setStep(step + 1)
     }
 
     const recordAudio = async (interval) => {
