@@ -45,6 +45,7 @@ const Check = () => {
         ["congestion_or_runny_nose", "Congestion or Runny Nose"],
         ["nausea_or_vomiting", "Nausea or Vomiting"],
     ]
+    const [MicrophonePermission, setMicrophonePermission] = useState(false)
 
     const [RecordedAudio, setRecordedAudio] = useState(null)
     const [Recording, setRecording] = useState(false)
@@ -63,14 +64,38 @@ const Check = () => {
 
     const nextStep = () => {
         setStep(step + 1)
+        askForMicrophonePermission()
+    }
+
+
+    const askForMicrophonePermission = () => {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+            setMicrophonePermission(true)
+        }).catch((error) => {
+            toast({
+                title: "Please allow microphone permission",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            })
+        })
     }
 
     const recordAudio = () => {
-        setProgressStart(true);
+        if (!MicrophonePermission) {
+            toast({
+                title: "Please allow microphone permission",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            })
+            return
+        }
 
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
             const recorder = new Recorder(stream);
             recorder.start();
+            setProgressStart(true);
 
             setTimeout(() => {
                 recorder.stop();
@@ -117,17 +142,23 @@ const Check = () => {
                         // do something
                     });
             }, 10000);
-        });
+            const startTime = Date.now();
+            const progressInterval = setInterval(() => {
+                const elapsedTime = Date.now() - startTime;
+                const progress = (elapsedTime / 10000) * 100; // Calculate progress percentage
+                setProgressNumber(progress);
+            }, 50);
 
+            setRecording(true);
+        }).catch((error) => {
+            toast({
+                title: "Please allow microphone permission",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            })
+        })
 
-        const startTime = Date.now();
-        const progressInterval = setInterval(() => {
-            const elapsedTime = Date.now() - startTime;
-            const progress = (elapsedTime / 10000) * 100; // Calculate progress percentage
-            setProgressNumber(progress);
-        }, 50);
-
-        setRecording(true);
     };
 
     const downsampleBuffer = (buffer, originalSampleRate, targetSampleRate) => {
@@ -295,6 +326,20 @@ const Check = () => {
                     </Box>
                 </Box>
             )}
+            {/* {step === 2 && (
+                <Box>
+                    <Button
+                        colorScheme='orange'
+                        bg="#f2805e"
+                        borderRadius='50px'
+                        
+                        onClick={() => askForMicrophonePermission()}
+                    >
+                        Need Microphone Permission
+                    </Button>
+
+                </Box>
+            )} */}
             {step === 2 && (
                 <Box
                     display='flex'
